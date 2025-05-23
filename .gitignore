@@ -1,4 +1,5 @@
-".env" 
-"users.json" 
-"groups.json" 
-"node_modules" 
+.env
+users.json
+groups.json
+pushed_posts.json
+node_modules

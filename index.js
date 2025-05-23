@@ -129,3 +129,8 @@ app.get('/fbpush', async (req, res) => {
     res.status(500).send('❌ 推播失敗');
   }
 });
+app.get('/fbpush', (req, res) => {
+  fetchAndPush()
+    .then(() => res.send('✅ 推播成功'))
+    .catch(err => res.status(500).send('❌ 推播失敗: ' + err.message));
+});
