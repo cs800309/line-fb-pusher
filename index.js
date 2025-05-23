@@ -9,128 +9,125 @@ const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
-
 const client = new line.Client(config);
 const app = express();
 app.use(bodyParser.json());
 
-// 載入/建立 users.json
+// users.json
 const usersFile = './users.json';
-let users = [];
-if (fs.existsSync(usersFile)) {
-  users = JSON.parse(fs.readFileSync(usersFile));
-  console.log('✅ 已載入 users.json：', users);
-}
+let users = fs.existsSync(usersFile)
+  ? JSON.parse(fs.readFileSync(usersFile))
+  : [];
 
-// 載入/建立 groups.json
+// groups.json
 const groupsFile = './groups.json';
-let groups = [];
-if (fs.existsSync(groupsFile)) {
-  groups = JSON.parse(fs.readFileSync(groupsFile));
-  console.log('✅ 已載入 groups.json：', groups);
+let groups = fs.existsSync(groupsFile)
+  ? JSON.parse(fs.readFileSync(groupsFile))
+  : [];
+
+// 推播相關
+const fbPages = [
+  { id: process.env.FB1_PAGE_ID, token: process.env.FB1_PAGE_TOKEN },
+  { id: process.env.FB2_PAGE_ID, token: process.env.FB2_PAGE_TOKEN }
+];
+const stateFile = './pushed_posts.json';
+let pushedIds = fs.existsSync(stateFile)
+  ? JSON.parse(fs.readFileSync(stateFile))
+  : [];
+
+function cleanText(raw) {
+  return (raw || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[^\x00-\x7F\u4E00-\u9FFF\s\p{P}]/gu, '')
+    .trim();
 }
 
+async function fetchAndPush() {
+  const userIds = process.env.LINE_USER_ID
+    ? process.env.LINE_USER_ID.split(',').map(id => id.trim())
+    : [];
+
+  for (const page of fbPages) {
+    const { id, token } = page;
+    if (!id || !token) continue;
+
+    try {
+      const res = await axios.get(
+        `https://graph.facebook.com/v18.0/${id}/posts?access_token=${token}&fields=message,permalink_url,created_time`
+      );
+      const posts = res.data.data || [];
+      const newest = posts.find(p => p.message && !pushedIds.includes(p.id));
+      if (!newest) continue;
+
+      pushedIds.push(newest.id);
+      fs.writeFileSync(stateFile, JSON.stringify(pushedIds, null, 2));
+
+      const text = `📢 ${cleanText(newest.message)}\n👉 ${newest.permalink_url}`;
+      console.log('🚀 推播內容：', text);
+
+      for (const uid of userIds) {
+        await client.pushMessage(uid, { type: 'text', text });
+        console.log(`✅ 已推播給 ${uid}`);
+      }
+    } catch (err) {
+      console.error('❌ 錯誤：', err.message);
+    }
+  }
+}
+
+// webhook 記錄 userId / groupId
 app.post('/webhook', (req, res) => {
   Promise.all(req.body.events.map(handleEvent))
     .then(result => res.json(result))
     .catch(err => {
-      console.error('❌ webhook 處理錯誤：', err);
+      console.error('❌ webhook 錯誤：', err);
       res.status(500).end();
     });
 });
 
-async function handleEvent(event) {
+function handleEvent(event) {
   const source = event.source;
+  if (event.type !== 'message' || event.message.type !== 'text') {
+    return Promise.resolve(null);
+  }
 
-  // 紀錄 userId 或 groupId
+  // userId
   if (source.type === 'user') {
     const userId = source.userId;
     if (!users.includes(userId)) {
       users.push(userId);
       fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
       console.log('✅ 已新增用戶 ID:', userId);
+    } else {
+      console.log('ℹ️ 用戶 ID 已存在:', userId);
     }
-  } else if (source.type === 'group') {
+  }
+
+  // groupId
+  if (source.type === 'group') {
     const groupId = source.groupId;
     if (!groups.includes(groupId)) {
       groups.push(groupId);
       fs.writeFileSync(groupsFile, JSON.stringify(groups, null, 2));
       console.log('✅ 已新增群組 ID:', groupId);
+    } else {
+      console.log('ℹ️ 群組 ID 已存在:', groupId);
     }
   }
 
-  // 查詢關鍵字指令
-  if (event.type === 'message' && event.message.type === 'text') {
-    const msg = event.message.text.trim();
-
-    if (msg === '查粉專' || msg === '查社區') {
-      return replyLatestPost(event.replyToken, process.env.FB1_PAGE_ID, process.env.FB1_PAGE_TOKEN);
-    }
-
-    if (msg === '查藥局') {
-      return replyLatestPost(event.replyToken, process.env.FB2_PAGE_ID, process.env.FB2_PAGE_TOKEN);
-    }
-
-    if (msg === '幫助') {
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: `📋 可用指令：\n🔍 查社區\n🔍 查藥局\n🔍 查粉專\n🔍 幫助`
-      });
-    }
-  }
-
-  return Promise.resolve(null); // 不回覆其他訊息
+  return Promise.resolve(null); // 不回覆任何訊息
 }
 
-async function replyLatestPost(replyToken, pageId, pageToken) {
-  try {
-    const res = await axios.get(
-      `https://graph.facebook.com/v18.0/${pageId}/posts?access_token=${pageToken}&fields=message,permalink_url`
-    );
+// cron-job.org 呼叫的路由
+app.get('/fbpush', (req, res) => {
+  fetchAndPush()
+    .then(() => res.send('✅ LINE 推播成功'))
+    .catch(err => res.status(500).send('❌ 推播失敗: ' + err.message));
+});
 
-    const posts = res.data.data;
-    console.log('📥 抓到貼文數：', posts.length);
-
-    if (!posts || posts.length === 0) {
-      return client.replyMessage(replyToken, {
-        type: 'text',
-        text: '找不到貼文喔！'
-      });
-    }
-
-    const latest = posts.find(p => p.message) || posts[0]; // 如果都沒有 message，就拿第一篇
-
-    const text = `${latest.message ? '📢 ' + latest.message.trim() + '\n' : ''}👉 ${latest.permalink_url}`;
-    return client.replyMessage(replyToken, { type: 'text', text });
-
-  } catch (err) {
-    console.error('❌ 查詢失敗：', err.message);
-    return client.replyMessage(replyToken, {
-      type: 'text',
-      text: '發生錯誤，請稍後再試 🙇‍♂️'
-    });
-  }
-}
-
+// 伺服器啟動
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`🚀 LINE Bot 伺服器啟動於 http://localhost:${port}`);
-});
-
-const fbPush = require('./fbPush');
-
-app.get('/fbpush', async (req, res) => {
-  console.log('📥 收到 EasyCron 呼叫 /fbpush');
-  try {
-    await fbPush();
-    res.send('✅ 推播成功');
-  } catch (err) {
-    console.error('❌ 推播失敗：', err.message);
-    res.status(500).send('❌ 推播失敗');
-  }
-});
-app.get('/fbpush', (req, res) => {
-  fetchAndPush()
-    .then(() => res.send('✅ 推播成功'))
-    .catch(err => res.status(500).send('❌ 推播失敗: ' + err.message));
 });
