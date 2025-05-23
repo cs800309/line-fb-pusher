@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: line-fb-pusher
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - fromDotEnv: true
+
+jobs:
+  - name: fbPush-daily
+    type: cron
+    env: node
+    schedule: "0 0 * * *" # 台灣時間 08:00（Render 是 UTC+0）
+    plan: free
+    buildCommand: npm install
+    startCommand: node fbPush.js
+    envVars:
+      - fromDotEnv: true
