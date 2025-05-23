@@ -1,3 +1,4 @@
+console.log('✅ 本次部署版本：2025-05-23-晚間');
 require('dotenv').config();
 const line = require('@line/bot-sdk');
 const express = require('express');

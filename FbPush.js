@@ -1,3 +1,4 @@
+console.log('✅ 本次部署版本：2025-05-23-晚間');
 require('dotenv').config();
 const axios = require('axios');
 const line = require('@line/bot-sdk');
@@ -60,3 +61,17 @@ async function fetchAndPush() {
       for (const uid of userIds) {
         await client.pushMessage(uid, { type: 'text', text });
         console.log(`✅ 已推播給 ${uid}`);
+      }
+    } catch (err) {
+      console.error('❌ 錯誤：', err.message);
+    }
+  }
+}
+
+// 如果是直接執行 fbPush.js，就執行推播
+if (require.main === module) {
+  fetchAndPush();
+}
+
+// 如果是被別人引入的，匯出 function 給外部使用（例如 index.js）
+module.exports = fetchAndPush;
