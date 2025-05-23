@@ -8,12 +8,11 @@ services:
     envVars:
       - fromDotEnv: true
 
-jobs:
-  - name: fbPush-daily
-    type: cron
+  - type: cron
+    name: fbPush-daily
     env: node
-    schedule: "0 0 * * *" # 台灣時間 08:00（Render 是 UTC+0）
     plan: free
+    schedule: "0 0 * * *"  # 台灣時間早上 08:00（UTC+0）
     buildCommand: npm install
     startCommand: node fbPush.js
     envVars:
