@@ -6,14 +6,15 @@ services:
     buildCommand: npm install
     startCommand: node index.js
     envVars:
-      - fromDotEnv: true
+      - key: fromDotEnv
+        value: true
 
   - type: cron
     name: fbPush-daily
     env: node
-    plan: free
     schedule: "0 0 * * *"  # 台灣時間早上 08:00（UTC+0）
     buildCommand: npm install
     startCommand: node fbPush.js
     envVars:
-      - fromDotEnv: true
+      - key: fromDotEnv
+        value: true
