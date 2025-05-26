@@ -15,7 +15,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // ✅ Google Sheet 記錄網址
-const googleScriptUrl = 'https://script.google.com/macros/s/AKfycby4hQFn86aF8xEfH5DuSTkiltzR8vWh2EpY1HYXbI2r07FeRU2kh40x9BVdWbWmf0WFhQ/exec';
+const googleScriptUrl = 'https://script.google.com/macros/s/AKfycbz0UFFMoqz4u0NcG_y4IC1q0k_9oYmEnCLKN4Zxrg4-RBGsjZdT8irouEbhKfRBdeyO/exec';
 
 // ✅ 傳送 userId 到 Google Sheet
 function sendToGoogleSheet(userId) {
@@ -80,12 +80,16 @@ async function fetchAndPush() {
       for (const uid of userIds) {
         await client.pushMessage(uid, { type: 'text', text });
         console.log(`✅ 已推播給 ${uid}`);
+
+        // ✅ 補充這行：推播時順便寫入 Google Sheet
+        sendToGoogleSheet(uid);
       }
     } catch (err) {
       console.error('❌ 錯誤：', err.message);
     }
   }
 }
+
 
 // webhook 記錄 userId / groupId
 app.post('/webhook', (req, res) => {
