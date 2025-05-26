@@ -15,7 +15,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // ✅ Google Sheet 記錄網址
-const googleScriptUrl = 'https://script.google.com/macros/s/AKfycbz0UFFMoqz4u0NcG_y4IC1q0k_9oYmEnCLKN4Zxrg4-RBGsjZdT8irouEbhKfRBdeyO/exec';
+const googleScriptUrl = 'https://script.google.com/macros/s/AKfycbxmqt_QhZdBuOtjlZKHRxXpcZM1pgsstXWlSEWD-dP9q-i_K98bbMbW2yc5VsGks5qg/exec';
 
 // ✅ 傳送 userId 到 Google Sheet
 function sendToGoogleSheet(userId) {
