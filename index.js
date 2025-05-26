@@ -1,4 +1,4 @@
-console.log('✅ 本次部署版本：2025-05-23-晚間');
+console.log('✅ 本次部署版本：2025-05-26');
 require('dotenv').config();
 const line = require('@line/bot-sdk');
 const express = require('express');
@@ -13,6 +13,16 @@ const config = {
 const client = new line.Client(config);
 const app = express();
 app.use(bodyParser.json());
+
+// ✅ Google Sheet 記錄網址
+const googleScriptUrl = 'https://script.google.com/macros/s/AKfycby4hQFn86aF8xEfH5DuSTkiltzR8vWh2EpY1HYXbI2r07FeRU2kh40x9BVdWbWmf0WFhQ/exec';
+
+// ✅ 傳送 userId 到 Google Sheet
+function sendToGoogleSheet(userId) {
+  return axios.post(googleScriptUrl, { userId })
+    .then(() => console.log('✅ 已寫入 Google Sheet:', userId))
+    .catch(err => console.error('❌ 寫入 Google Sheet 失敗:', err.message));
+}
 
 // users.json
 const usersFile = './users.json';
@@ -100,6 +110,7 @@ function handleEvent(event) {
       users.push(userId);
       fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
       console.log('✅ 已新增用戶 ID:', userId);
+      sendToGoogleSheet(userId); // ⭐ 同步寫入 Google Sheet
     } else {
       console.log('ℹ️ 用戶 ID 已存在:', userId);
     }
@@ -117,7 +128,7 @@ function handleEvent(event) {
     }
   }
 
-  return Promise.resolve(null); // 不回覆任何訊息
+  return Promise.resolve(null); // 不回應訊息
 }
 
 // cron-job.org 呼叫的路由
